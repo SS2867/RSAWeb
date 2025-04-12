@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html>
+<head></head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="title">RSA 加密/签名工具</title>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/forge/0.10.0/forge.min.js"></script> -->
+    <script src="./forge.min.js"></script>
+    <style>
+        #languageSwitch {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        #togglePanel {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #keyPanel {
+            float: left;
+            width: 300px;
+            padding: 20px;
+            background: #f0f0f0;
+            margin-right: 20px;
+        }
+        
+        #mainPanel {
+            margin-left: 340px;
+            padding: 20px;
+            transform: 0.3s;
+        }
+        #mainPanel.full {
+            margin-left:0px;
+            padding: 20px;
+            
+            transform: 0.3s;
+        }
+
+        
+        .tab {
+            overflow: hidden;
+            border: 1px solid #ccc;
+            background-color: #f1f1f1;
+        }
+        
+        .tab button {
+            background-color: inherit;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 14px 16px;
+            transition: 0.3s;
+        }
+        
+        .tab button:hover {
+            background-color: #ddd;
+        }
+        
+        .tab button.active {
+            background-color: #ccc;
+        }
+        
+        .tabContent {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-top: none;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin: 10px 0;
+        }
+        
+        .button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+        }
+        .button:disabled {
+            background: #ccc; 
+            color: #666;  
+            cursor: not-allowed; 
+        }
+    </style>
+</head>
+<body>
+    <button id="languageSwitch" class="button" onclick="switchLanguage()">中文</button>
+
+    <button id="togglePanel" class="button" onClick="toggleGenerationPanel()" data-i18n="togglePanel">Show/Hide Key Panel</button>
+    <div id="keyPanel">
+        <h3 data-i18n="rsaKeys">RSA密钥</h3>
+        <button id="generateKeys" class="button" onclick="generateKeys()" data-i18n="generateKeys">生成新密钥</button>
+        <div>
+            <label data-i18n="publicKey">公钥:</label>
+            <textarea id="publicKey" data-placeholder-i18n="publicKeyPlaceholder"></textarea>
+        </div>
+        <div>
+            <label data-i18n="privateKey">私钥:</label>
+            <textarea id="privateKey" data-placeholder-i18n="privateKeyPlaceholder"></textarea>
+        </div>
+        <button id="embedToUrl" class="button" onclick="embedToUrl()" data-i18n="embedToUrl">生成新密钥</button>
+    </div>
+
+    <div id="mainPanel">
+        <div class="tab">
+            <button class="tabLinks" onclick="openTab(event, 'crypto')" id="tab0" data-i18n="encryptDecrypt">加密/解密</button>
+            <button class="tabLinks" onclick="openTab(event, 'sign')" id="tab1" data-i18n="signVerify">签名/验证</button>
+        </div>
+
+        <div id="crypto" class="tabContent">
+            <h3 data-i18n="encryption">加密</h3>
+            <textarea id="encryptInput" data-placeholder-i18n="encryptInput"></textarea>
+            <button class="button" onclick="encrypt()" data-i18n="encrypt">加密</button>
+            <textarea id="encryptOutput" data-placeholder-i18n="encryptOutput"></textarea>
+
+            <h3 data-i18n="decryption">解密</h3>
+            <textarea id="decryptInput" data-placeholder-i18n="decryptInput"></textarea>
+            <button class="button" onclick="decrypt()" data-i18n="decrypt">解密</button>
+            <textarea id="decryptOutput" data-placeholder-i18n="decryptOutput"></textarea>
+        </div>
+
+        <div id="sign" class="tabContent">
+            <h3 data-i18n="signing">签名</h3>
+            <textarea id="signInput" data-placeholder-i18n="signInput"></textarea>
+            <button class="button" onclick="signMessage()" data-i18n="generateSign">生成签名</button>
+            <textarea id="signatureOutput" data-placeholder-i18n="signOutput"></textarea>
+
+            <h3 data-i18n="verification">验证</h3>
+            <textarea id="verifyMessage" data-placeholder-i18n="verifyMessage"></textarea>
+            <textarea id="verifySignature" data-placeholder-i18n="verifySignature"></textarea>
+            <button class="button" onclick="verifySignature()" data-i18n="verify">验证签名</button>
+            <div id="verifyResultSuccess" style="display: none;"><span data-i18n="success" style="color:green"></span></div>
+            <div id="verifyResultFailure" style="display: none;"><span data-i18n="failure" style="color:red"></span></div>
+        </div>
+    </div>
+
+    <script>
+        const translations = {
+            zh: {
+                title: "RSA 加密/签名工具",
+                togglePanel: "显示/隐藏密钥面板",
+                rsaKeys: "RSA密钥",
+                generateKeys: "生成新密钥",
+                publicKey: "公钥:",
+                privateKey: "私钥:",
+                publicKeyPlaceholder: "公钥将在此显示",
+                privateKeyPlaceholder: "私钥将在此显示",
+                pleaseWait: "请稍等",
+                generateNewKeysConfirm: "生成新密钥将覆盖密钥面板现有密钥，真的要生成新密钥吗？",
+                embedToUrl: "嵌入密钥至URL",
+                encryptDecrypt: "加密/解密",
+                signVerify: "签名/验证",
+                encryption: "加密",
+                encryptInput: "输入要加密的明文",
+                encrypt: "加密",
+                encryptOutput: "加密结果将在此显示",
+                encryptFailed: "加密失败，可能是密钥格式错误或消息过长",
+                decryption: "解密",
+                decryptInput: "输入要解密的密文",
+                decrypt: "解密",
+                decryptOutput: "解密结果将在此显示",
+                decryptFailed: "解密失败，请检查密钥和密文是否正确",
+                signing: "签名",
+                signInput: "输入要签名的消息",
+                generateSign: "生成签名",
+                signOutput: "签名将在此显示",
+                signFailed: "签名生成失败，请检查私钥是否正确",
+                verification: "验证",
+                verifyMessage: "输入原始消息",
+                verifySignature: "输入签名",
+                verify: "验证签名",
+                verifyFailed: "签名验证出错，可能是公钥或签名格式无效",
+                success: "签名验证成功",
+                failure: "签名验证失败"
+            },
+            en: {
+                title: "RSA Encryption/Signature Tool",
+                togglePanel: "Show/Hide Key Panel",
+                rsaKeys: "RSA Keys",
+                generateKeys: "Generate New Keys",
+                publicKey: "Public Key:",
+                privateKey: "Private Key:",
+                publicKeyPlaceholder: "Public key will be displayed here",
+                privateKeyPlaceholder: "Private key will be displayed here",
+                pleaseWait: "Please wait",
+                generateNewKeysConfirm: "Generating a new key will overwrite the existing key in the key panel. Do you really want to generate a new key?",
+                embedToUrl: "Embed keys into URL",
+                encryptDecrypt: "Encrypt/Decrypt",
+                signVerify: "Sign/Verify",
+                encryption: "Encryption",
+                encryptInput: "Enter plaintext to encrypt",
+                encrypt: "Encrypt",
+                encryptOutput: "Encrypted result will be displayed here",
+                encryptFailed: "Encryption failed, possibly due to incorrect key format or message being too long.",
+                decryption: "Decryption",
+                decryptInput: "Enter ciphertext to decrypt",
+                decrypt: "Decrypt",
+                decryptOutput: "Decrypted result will be displayed here",
+                decryptFailed: "Decryption failed. Please check whether the key and ciphertext are correct.",
+                signing: "Signing",
+                signInput: "Enter message to sign",
+                generateSign: "Generate Signature",
+                signOutput: "Signature will be displayed here",
+                signFailed: "Sign failed, please check whether the private key is correct",
+                verification: "Verification",
+                verifyMessage: "Enter original message",
+                verifySignature: "Enter signature",
+                verify: "Verify Signature",
+                verifyFailed: "An error occurred in signature verification, possibly due to invalid public key or signature format",
+                success: "Signature verification succeeded",
+                failure: "Signature verification failed"
+            }
+        };
+
+        let currentLang = navigator.language.toLowerCase().includes("zh")?'zh':'en';
+
+        function updateLanguageDisplay(){
+            
+            document.getElementById('languageSwitch').textContent = currentLang === 'zh' ? 'English' : '中文';
+            
+            // 更新普通文本
+            document.querySelectorAll('[data-i18n]').forEach(element => {
+                const key = element.getAttribute('data-i18n');
+                element.textContent = translations[currentLang][key];
+            });
+
+            // 更新placeholder
+            document.querySelectorAll('[data-placeholder-i18n]').forEach(element => {
+                const key = element.getAttribute('data-placeholder-i18n');
+                element.placeholder = translations[currentLang][key];
+            });
+
+            // 更新页面标题
+            document.title = translations[currentLang].title;
+        }
+
+        function switchLanguage() {
+            currentLang = currentLang === 'zh' ? 'en' : 'zh';
+            updateLanguageDisplay();
+        }
+
+        
+        function verifySignature() {
+            const publicKeyPem = document.getElementById('publicKey').value;
+            const publicKey = forge.pki.publicKeyFromPem(publicKeyPem);
+            const message = document.getElementById('verifyMessage').value;
+            const signature = forge.util.decode64(document.getElementById('verifySignature').value);
+            
+            const md = forge.md.sha256.create();
+            md.update(message, 'utf8');
+            
+            const valid = publicKey.verify(md.digest().bytes(), signature);
+            document.getElementById('verifyResult').innerHTML = valid ? 
+                `<span style="color:green">${translations[currentLang].success}</span>` : 
+                `<span style="color:red">${translations[currentLang].failure}</span>`;
+        }
+
+        // 在页面加载时初始化语言
+        document.addEventListener('DOMContentLoaded', () => {
+            // 尝试读取保存的语言设置
+            const savedLang = localStorage.getItem('rsaToolLang');
+            if(savedLang) {currentLang = savedLang;}
+            if(translations[urlParams.get("lang")]){currentLang=urlParams.get("lang");}
+            updateLanguageDisplay();
+        });
+
+        function toggleGenerationPanel(){
+            let keyPanel = document.getElementById("keyPanel");
+            let mainPanel = document.getElementById("mainPanel");
+
+            if(keyPanel.style.display!="none"){
+                keyPanel.style.display="none";
+                mainPanel.classList.add("full");
+            }else{
+                keyPanel.style.display="";
+                mainPanel.classList.remove("full");
+            }
+        }
+
+        function embedToUrl(){
+            let currentUrl = new URL(window.location.href);
+            let params = new URLSearchParams();
+            params.set('tab', document.getElementsByClassName("active")[0].id.slice(3));
+            params.set('lang', currentLang);
+            ["publicKey", "privateKey"].forEach((i)=>{
+                const value = document.getElementById(i).value
+                if(value){params.set(i, value)}
+            })
+            currentUrl.search = params.toString();
+            window.history.replaceState({}, '', currentUrl);
+        }
+
+        // 标签切换功能
+        function openTab(evt, tabName) {
+            let tabContent = document.getElementsByClassName("tabContent");
+            for (let tab of tabContent) {
+                tab.style.display = "none";
+            }
+            
+            let tabLinks = document.getElementsByClassName("tabLinks");
+            for (let link of tabLinks) {
+                link.className = link.className.replace(" active", "");
+            }
+            
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+        }
+        document.getElementById("tab0").click();
+
+        // 生成RSA密钥对
+        function generateKeys() {
+            if(document.getElementById('publicKey').value || document.getElementById('privateKey').value){
+                if(!window.confirm(translations[currentLang].generateNewKeysConfirm)){return;}
+            }
+            const generateKeysButton = document.getElementById("generateKeys");
+            generateKeysButton.innerHTML = translations[currentLang].pleaseWait;
+            generateKeysButton.setAttribute("disabled","");
+            setTimeout(()=>{
+                const keys = forge.pki.rsa.generateKeyPair({bits: 2048});
+                const publicKey = forge.pki.publicKeyToPem(keys.publicKey);
+                const privateKey = forge.pki.privateKeyToPem(keys.privateKey);
+                
+                document.getElementById('publicKey').value = publicKey;
+                document.getElementById('privateKey').value = privateKey;
+                setTimeout( ()=>{
+                    generateKeysButton.innerHTML = translations[currentLang].generateKeys;
+                    generateKeysButton.removeAttribute("disabled");
+                }, 0);
+            }, 0);
+        }
+
+        // 加密函数
+        function encrypt() {
+            const publicKeyPem = document.getElementById('publicKey').value;
+            const text = document.getElementById('encryptInput').value;
+            try{
+                const publicKey = forge.pki.publicKeyFromPem(publicKeyPem);
+                const encrypted = publicKey.encrypt(text, 'RSA-OAEP');
+                document.getElementById('encryptOutput').value = forge.util.encode64(encrypted);
+            }catch (err){
+                alert(translations[currentLang].encryptFailed);
+                throw err;
+            }
+        }
+
+        // 解密函数
+        function decrypt() {
+            const privateKeyPem = document.getElementById('privateKey').value;
+            const encrypted = forge.util.decode64(document.getElementById('decryptInput').value);
+            try {
+                const privateKey = forge.pki.privateKeyFromPem(privateKeyPem);
+                const decrypted = privateKey.decrypt(encrypted, 'RSA-OAEP');
+                document.getElementById('decryptOutput').value = decrypted;
+            } catch (err) {
+                alert(translations[currentLang].decryptFailed);
+                throw err;
+            }
+        }
+
+        // 签名函数
+        function signMessage() {
+            const privateKeyPem = document.getElementById('privateKey').value;
+            const message = document.getElementById('signInput').value;
+
+            const md = forge.md.sha256.create();
+            md.update(message, 'utf8');
+            try{
+                const privateKey = forge.pki.privateKeyFromPem(privateKeyPem);
+                const signature = privateKey.sign(md);
+                document.getElementById('signatureOutput').value = forge.util.encode64(signature);
+            }catch (e){
+                alert(translations[currentLang].signFailed);
+                throw e;
+            }
+        }
+
+        // 验证签名函数
+        function verifySignature() {
+            const publicKeyPem = document.getElementById('publicKey').value;
+            const message = document.getElementById('verifyMessage').value;
+            
+            const md = forge.md.sha256.create();
+            md.update(message, 'utf8');
+            try{
+                const signature = forge.util.decode64(document.getElementById('verifySignature').value);
+                const publicKey = forge.pki.publicKeyFromPem(publicKeyPem);
+                const valid = publicKey.verify(md.digest().bytes(), signature);
+                document.getElementById("verifyResultSuccess").style.display = valid? "block":"none";
+                document.getElementById("verifyResultFailure").style.display = valid? "none":"block";
+            }catch (e){
+                alert(translations[currentLang].verifyFailed);
+                throw e;
+            }
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        if(urlParams.get("publicKey")){document.getElementById("publicKey").value = urlParams.get("publicKey");}
+        if(urlParams.get("privateKey")){document.getElementById("privateKey").value = urlParams.get("privateKey");}
+        if(urlParams.get("publicKey")&&urlParams.get("privateKey")){toggleGenerationPanel;}
+        if(urlParams.get("tab") && parseInt(urlParams.get("tab"))>=0){
+            try{document.getElementById("tab"+(parseInt(urlParams.get("tab"))-0)).click()}catch(e){throw e;}
+        }
+
+    </script>
+</body>
+</html>
