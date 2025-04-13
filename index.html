@@ -76,12 +76,21 @@
         
         textarea {
             width: 100%;
-            height: 100px;
+            height: 80px;
             margin: 10px 0;
         }
-        
+        .password {
+            -webkit-text-security: disc !important;
+        }
         .button {
             background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+        }
+        .button:active {
+            background: #38803a;
             color: white;
             padding: 10px 20px;
             border: none;
@@ -107,7 +116,9 @@
         </div>
         <div>
             <label data-i18n="privateKey">私钥:</label>
-            <textarea id="privateKey" data-placeholder-i18n="privateKeyPlaceholder"></textarea>
+            <textarea id="privateKey" class="password" data-placeholder-i18n="privateKeyPlaceholder"></textarea>
+            <button id="togglePrivateKeyVisibility" class="button" onclick="togglePrivateKeyVisibility()">👁️</button>
+            <br><br>
         </div>
         <button id="embedToUrl" class="button" onclick="embedToUrl()" data-i18n="embedToUrl">生成新密钥</button>
     </div>
@@ -144,6 +155,10 @@
             <div id="verifyResultFailure" style="display: none;"><span data-i18n="failure" style="color:red"></span></div>
         </div>
     </div>
+    
+    <footer>
+        Built by <a href="https://github.com/SS2867">SS2867</a>. Source on <a href="https://github.com/SS2867/RSAWeb">GitHub</a>.
+    </footer>
 
     <script>
         const translations = {
@@ -156,9 +171,11 @@
                 privateKey: "私钥:",
                 publicKeyPlaceholder: "公钥将在此显示",
                 privateKeyPlaceholder: "私钥将在此显示",
+                showPrivateKeyConfirm: "警告：私钥必须安全妥善存储，且不应与任何人共享！\n确定要展示私钥吗？",
                 pleaseWait: "请稍等",
                 generateNewKeysConfirm: "生成新密钥将覆盖密钥面板现有密钥，真的要生成新密钥吗？",
-                embedToUrl: "嵌入密钥至URL",
+                embedToUrl: "复制嵌入密钥的URL",
+                embedPrivateKeyConfirm: "要将私钥一并嵌入URL吗？\n警告：嵌有私钥的URL必须安全妥善存储，且不应与任何人共享！",
                 encryptDecrypt: "加密/解密",
                 signVerify: "签名/验证",
                 encryption: "加密",
@@ -193,9 +210,13 @@
                 privateKey: "Private Key:",
                 publicKeyPlaceholder: "Public key will be displayed here",
                 privateKeyPlaceholder: "Private key will be displayed here",
+                showPrivateKeyConfirm: "WARNING: Private keys must be stored securely and should not be shared with anyone! \n"+
+                    "Are you sure you want to show your private key?",
                 pleaseWait: "Please wait",
                 generateNewKeysConfirm: "Generating a new key will overwrite the existing key in the key panel. Do you really want to generate a new key?",
-                embedToUrl: "Embed keys into URL",
+                embedToUrl: "Copy URL with keys embedded",
+                embedPrivateKeyConfirm: "Do you want to embed the private key in the URL? \n"+
+                    "WARNING: URLs with embedded private keys must be stored securely and should not be shared with anyone!",
                 encryptDecrypt: "Encrypt/Decrypt",
                 signVerify: "Sign/Verify",
                 encryption: "Encryption",
@@ -245,26 +266,12 @@
             document.title = translations[currentLang].title;
         }
 
+
         function switchLanguage() {
             currentLang = currentLang === 'zh' ? 'en' : 'zh';
             updateLanguageDisplay();
         }
 
-        
-        function verifySignature() {
-            const publicKeyPem = document.getElementById('publicKey').value;
-            const publicKey = forge.pki.publicKeyFromPem(publicKeyPem);
-            const message = document.getElementById('verifyMessage').value;
-            const signature = forge.util.decode64(document.getElementById('verifySignature').value);
-            
-            const md = forge.md.sha256.create();
-            md.update(message, 'utf8');
-            
-            const valid = publicKey.verify(md.digest().bytes(), signature);
-            document.getElementById('verifyResult').innerHTML = valid ? 
-                `<span style="color:green">${translations[currentLang].success}</span>` : 
-                `<span style="color:red">${translations[currentLang].failure}</span>`;
-        }
 
         // 在页面加载时初始化语言
         document.addEventListener('DOMContentLoaded', () => {
@@ -288,17 +295,35 @@
             }
         }
 
+        function togglePrivateKeyVisibility(){
+            const privateKeyElement = document.getElementById("privateKey");
+            if(privateKeyElement.classList.contains("password")){
+                if(window.confirm(translations[currentLang].showPrivateKeyConfirm)){
+                    privateKeyElement.classList.remove("password");}
+            }else{privateKeyElement.classList.add("password");}
+        }
+        function updateTogglePrivateKeyVisibility(){
+            const privateKeyElement = document.getElementById("privateKey");
+            if(!privateKeyElement.value){
+                if(!privateKeyElement.classList.contains("password")){privateKeyElement.classList.add("password");}
+            }
+        }
+
         function embedToUrl(){
             let currentUrl = new URL(window.location.href);
             let params = new URLSearchParams();
             params.set('tab', document.getElementsByClassName("active")[0].id.slice(3));
             params.set('lang', currentLang);
-            ["publicKey", "privateKey"].forEach((i)=>{
+            /*["publicKey", "privateKey"].forEach((i)=>{
                 const value = document.getElementById(i).value
                 if(value){params.set(i, value)}
-            })
+            })*/
+            params.set("publicKey", document.getElementById("publicKey").value);
+            params.set("privateKey", document.getElementById("privateKey").value&&
+                window.confirm(translations[currentLang].embedPrivateKeyConfirm)? document.getElementById("privateKey").value:"");
             currentUrl.search = params.toString();
-            window.history.replaceState({}, '', currentUrl);
+            //window.history.replaceState({}, '', currentUrl);
+            setTimeout(()=>navigator.clipboard.writeText(currentUrl), 0);
         }
 
         // 标签切换功能
@@ -336,6 +361,7 @@
                 setTimeout( ()=>{
                     generateKeysButton.innerHTML = translations[currentLang].generateKeys;
                     generateKeysButton.removeAttribute("disabled");
+                    updateTogglePrivateKeyVisibility();
                 }, 0);
             }, 0);
         }
@@ -389,6 +415,7 @@
         function verifySignature() {
             const publicKeyPem = document.getElementById('publicKey').value;
             const message = document.getElementById('verifyMessage').value;
+            ["verifyResultSuccess", "verifyResultFailure"].forEach(i=>document.getElementById(i).style.display="none");
             
             const md = forge.md.sha256.create();
             md.update(message, 'utf8');
@@ -411,7 +438,7 @@
         if(urlParams.get("tab") && parseInt(urlParams.get("tab"))>=0){
             try{document.getElementById("tab"+(parseInt(urlParams.get("tab"))-0)).click()}catch(e){throw e;}
         }
-
+        updateTogglePrivateKeyVisibility();
     </script>
 </body>
 </html>
