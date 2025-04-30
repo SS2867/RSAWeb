@@ -79,6 +79,9 @@
             height: 80px;
             margin: 10px 0;
         }
+        textarea.dirty {
+            border-color: red !important;
+        }
         .password {
             -webkit-text-security: disc !important;
         }
@@ -101,12 +104,53 @@
             color: #666;  
             cursor: not-allowed; 
         }
+        #encodingContainer {
+            margin: 15px 0;
+            display: inline-block;
+            background: #f8f8f8;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        #encodingSelect {
+            padding: 6px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: white;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        #encodingSelect:hover {
+            border-color: #888;
+            box-shadow: 0 0 3px rgba(0,0,0,0.1);
+        }
+
+        #encodingSelect:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 5px rgba(76,175,80,0.3);
+        }
+
+        #encodingContainer label {
+            margin-right: 10px;
+            font-weight: bold;
+            color: #555;
+        }
     </style>
 </head>
 <body>
     <button id="languageSwitch" class="button" onclick="switchLanguage()">中文</button>
 
     <button id="togglePanel" class="button" onClick="toggleGenerationPanel()" data-i18n="togglePanel">Show/Hide Key Panel</button>
+    <label data-i18n="encodingSelectLabel">文本编码:</label>
+    <select id="encodingSelect">
+        <option value="ASCII">ASCII</option>
+        <option value="UTF-8" selected>UTF-8</option>
+        <option value="Base16">Base16</option>
+        <option value="Base64">Base64</option>
+    </select>
     <div id="keyPanel">
         <h3 data-i18n="rsaKeys">RSA密钥</h3>
         <button id="generateKeys" class="button" onclick="generateKeys()" data-i18n="generateKeys">生成新密钥</button>
@@ -128,6 +172,8 @@
             <button class="tabLinks" onclick="openTab(event, 'crypto')" id="tab0" data-i18n="encryptDecrypt">加密/解密</button>
             <button class="tabLinks" onclick="openTab(event, 'sign')" id="tab1" data-i18n="signVerify">签名/验证</button>
         </div>
+
+        
 
         <div id="crypto" class="tabContent">
             <h3 data-i18n="encryption">加密</h3>
@@ -164,6 +210,7 @@
         const translations = {
             zh: {
                 title: "RSA 加密/签名工具",
+                encodingSelectLabel: "文本编码:",
                 togglePanel: "显示/隐藏密钥面板",
                 rsaKeys: "RSA密钥",
                 generateKeys: "生成新密钥",
@@ -182,7 +229,7 @@
                 encryptInput: "输入要加密的明文",
                 encrypt: "加密",
                 encryptOutput: "加密结果将在此显示",
-                encryptFailed: "加密失败，可能是密钥格式错误或消息过长",
+                encryptFailed: "加密失败，可能是密钥格式错误、消息格式错误或过长",
                 decryption: "解密",
                 decryptInput: "输入要解密的密文",
                 decrypt: "解密",
@@ -192,7 +239,7 @@
                 signInput: "输入要签名的消息",
                 generateSign: "生成签名",
                 signOutput: "签名将在此显示",
-                signFailed: "签名生成失败，请检查私钥是否正确",
+                signFailed: "签名生成失败，请检查消息格式及私钥是否正确",
                 verification: "验证",
                 verifyMessage: "输入原始消息",
                 verifySignature: "输入签名",
@@ -203,6 +250,7 @@
             },
             en: {
                 title: "RSA Encryption/Signature Tool",
+                encodingSelectLabel: "Text Encoding:",
                 togglePanel: "Show/Hide Key Panel",
                 rsaKeys: "RSA Keys",
                 generateKeys: "Generate New Keys",
@@ -223,7 +271,7 @@
                 encryptInput: "Enter plaintext to encrypt",
                 encrypt: "Encrypt",
                 encryptOutput: "Encrypted result will be displayed here",
-                encryptFailed: "Encryption failed, possibly due to incorrect key format or message being too long.",
+                encryptFailed: "Encryption failed, possibly due to incorrect key format, incorrect message format or too long",
                 decryption: "Decryption",
                 decryptInput: "Enter ciphertext to decrypt",
                 decrypt: "Decrypt",
@@ -233,7 +281,7 @@
                 signInput: "Enter message to sign",
                 generateSign: "Generate Signature",
                 signOutput: "Signature will be displayed here",
-                signFailed: "Sign failed, please check whether the private key is correct",
+                signFailed: "Sign failed. Please check whether the message format and private key are correct.",
                 verification: "Verification",
                 verifyMessage: "Enter original message",
                 verifySignature: "Enter signature",
@@ -245,6 +293,7 @@
         };
 
         let currentLang = navigator.language.toLowerCase().includes("zh")?'zh':'en';
+        let currentEncoding = 'UTF-8'; 
 
         function updateLanguageDisplay(){
             
@@ -264,20 +313,30 @@
 
             // 更新页面标题
             document.title = translations[currentLang].title;
+
         }
 
 
         function switchLanguage() {
             currentLang = currentLang === 'zh' ? 'en' : 'zh';
+            localStorage.setItem('rsaToolLang', currentLang);
             updateLanguageDisplay();
         }
 
+        document.getElementById('encodingSelect').addEventListener('change', function() {
+            currentEncoding = this.value;
+            localStorage.setItem('rsaToolEncoding', currentEncoding);
+        });
 
         // 在页面加载时初始化语言
         document.addEventListener('DOMContentLoaded', () => {
             // 尝试读取保存的语言设置
             const savedLang = localStorage.getItem('rsaToolLang');
             if(savedLang) {currentLang = savedLang;}
+            const savedEncoding = localStorage.getItem('rsaToolEncoding');
+            if(savedEncoding) {
+                currentEncoding = savedEncoding; 
+                document.getElementById('encodingSelect').value = currentEncoding;}
             if(translations[urlParams.get("lang")]){currentLang=urlParams.get("lang");}
             updateLanguageDisplay();
         });
@@ -314,6 +373,7 @@
             let params = new URLSearchParams();
             params.set('tab', document.getElementsByClassName("active")[0].id.slice(3));
             params.set('lang', currentLang);
+            params.set('encoding', currentEncoding);
             /*["publicKey", "privateKey"].forEach((i)=>{
                 const value = document.getElementById(i).value
                 if(value){params.set(i, value)}
@@ -365,17 +425,78 @@
                 }, 0);
             }, 0);
         }
+        
+        function cleanText(text, encoding) {
+            let cleaned = text;
+            let isDirty = false;
+            switch(encoding) {
+                case 'Base16':
+                    cleaned = text.replace(/[^0-9A-F]/gi, '').toLowerCase();
+                    break;
+                case 'Base32':
+                    cleaned = text.replace(/[^A-Z2-7=]/gi, '').toUpperCase();
+                    break;
+                case 'Base64':
+                    cleaned = text.replace(/[^A-Za-z0-9+/=]/g, '');
+                    break;
+                case 'Base85':
+                    cleaned = text.replace(/\s+/g, '');
+                    break;
+                case 'ASCII':
+                    cleaned = text.split('').map(c => c.charCodeAt(0) <= 0x7F ? c : '').join('');
+                    break;
+                default:
+                    break;
+            }
+            isDirty = cleaned !== text;
+            return { cleanedText: cleaned, isDirty: isDirty };
+        }
+
+        function encodeText(text, encoding) {
+            switch(encoding) {
+                case 'ASCII':
+                    return forge.util.encodeUtf8(
+                        text.split('').map(c => c.charCodeAt(0) <= 0x7F ? c : '').join('')
+                    );
+                case 'UTF-8':
+                    return forge.util.encodeUtf8(text);
+                case 'Base16':
+                    return forge.util.hexToBytes(text);
+                case 'Base64':
+                    return forge.util.decode64(text);
+                default:
+                    return text;
+            }
+        }
+
+        function decodeText(data, encoding) {
+            switch(encoding) {
+                case 'ASCII':
+                case 'UTF-8':
+                    return forge.util.decodeUtf8(data);
+                case 'Base16':
+                    return forge.util.bytesToHex(data);
+                case 'Base64':
+                    return forge.util.encode64(data);
+                default:
+                    return data;
+            }
+        }
 
         // 加密函数
         function encrypt() {
             const publicKeyPem = document.getElementById('publicKey').value;
-            const text = document.getElementById('encryptInput').value;
+            const originalText = document.getElementById('encryptInput').value;
+            const {cleanedText:text, isDirty:isDirty} = cleanText(originalText, currentEncoding);
+            document.getElementById('encryptInput').classList.toggle('dirty', isDirty);
             try{
                 const publicKey = forge.pki.publicKeyFromPem(publicKeyPem);
-                const encrypted = publicKey.encrypt(text, 'RSA-OAEP');
+                const inputData = encodeText(text, currentEncoding);
+                const encrypted = publicKey.encrypt(inputData, 'RSA-OAEP');
+                document.getElementById('encryptOutput').classList.remove("dirty");
                 document.getElementById('encryptOutput').value = forge.util.encode64(encrypted);
             }catch (err){
-                alert(translations[currentLang].encryptFailed);
+                alert(translations[currentLang].encryptFailed +"\n"+err);
                 throw err;
             }
         }
@@ -387,9 +508,11 @@
             try {
                 const privateKey = forge.pki.privateKeyFromPem(privateKeyPem);
                 const decrypted = privateKey.decrypt(encrypted, 'RSA-OAEP');
-                document.getElementById('decryptOutput').value = decrypted;
+                const outputText = decodeText(decrypted, currentEncoding);
+                document.getElementById('decryptOutput').classList.remove("dirty");
+                document.getElementById('decryptOutput').value = outputText;
             } catch (err) {
-                alert(translations[currentLang].decryptFailed);
+                alert(translations[currentLang].decryptFailed+"\n"+err);
                 throw err;
             }
         }
@@ -397,16 +520,20 @@
         // 签名函数
         function signMessage() {
             const privateKeyPem = document.getElementById('privateKey').value;
-            const message = document.getElementById('signInput').value;
-
-            const md = forge.md.sha256.create();
-            md.update(message, 'utf8');
+            const originalMessage = document.getElementById('signInput').value;
+            const {cleanedText:message, isDirty:isDirty} = cleanText(originalMessage, currentEncoding);
+            document.getElementById('signInput').classList.toggle('dirty', isDirty);
             try{
+                const inputData = encodeText(message, currentEncoding);
+                const md = forge.md.sha256.create();
+                md.update(inputData, 'binary');
+
                 const privateKey = forge.pki.privateKeyFromPem(privateKeyPem);
                 const signature = privateKey.sign(md);
+                document.getElementById('signatureOutput').classList.remove("dirty");
                 document.getElementById('signatureOutput').value = forge.util.encode64(signature);
             }catch (e){
-                alert(translations[currentLang].signFailed);
+                alert(translations[currentLang].signFailed+"\n"+e);
                 throw e;
             }
         }
@@ -414,22 +541,31 @@
         // 验证签名函数
         function verifySignature() {
             const publicKeyPem = document.getElementById('publicKey').value;
-            const message = document.getElementById('verifyMessage').value;
+            const originalMessage = document.getElementById('verifyMessage').value;
+            const {cleanedText:message, isDirty:isDirty} = cleanText(originalMessage, currentEncoding);
+            document.getElementById('verifyMessage').classList.toggle('dirty', isDirty);
             ["verifyResultSuccess", "verifyResultFailure"].forEach(i=>document.getElementById(i).style.display="none");
             
-            const md = forge.md.sha256.create();
-            md.update(message, 'utf8');
             try{
+                const inputData = encodeText(message, currentEncoding);
+                const md = forge.md.sha256.create();
+                md.update(inputData, 'binary');
+
                 const signature = forge.util.decode64(document.getElementById('verifySignature').value);
                 const publicKey = forge.pki.publicKeyFromPem(publicKeyPem);
                 const valid = publicKey.verify(md.digest().bytes(), signature);
                 document.getElementById("verifyResultSuccess").style.display = valid? "block":"none";
                 document.getElementById("verifyResultFailure").style.display = valid? "none":"block";
             }catch (e){
-                alert(translations[currentLang].verifyFailed);
+                alert(translations[currentLang].verifyFailed+"\n"+e);
                 throw e;
             }
         }
+
+        ["encryptOutput", "decryptOutput", "signatureOutput"].forEach((i)=>{
+            document.getElementById(i).addEventListener('change', function() {
+                this.classList.add("dirty");
+            })})
 
         const urlParams = new URLSearchParams(window.location.search);
         if(urlParams.get("publicKey")){document.getElementById("publicKey").value = urlParams.get("publicKey");}
@@ -438,6 +574,8 @@
         if(urlParams.get("tab") && parseInt(urlParams.get("tab"))>=0){
             try{document.getElementById("tab"+(parseInt(urlParams.get("tab"))-0)).click()}catch(e){throw e;}
         }
+        if(urlParams.get("encoding")){ try{currentEncoding = urlParams.get("encoding");} catch{}}
+        document.getElementById('encodingSelect').value = currentEncoding;
         updateTogglePrivateKeyVisibility();
     </script>
 </body>
